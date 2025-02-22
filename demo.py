@@ -8,6 +8,26 @@ from langchain_core.messages import (
     SystemMessage,
     AIMessage,
 )
+
+from rag_demo import RagApplication, ApplicationConfig
+from trustrag.modules.retrieval.dense_retriever import DenseRetrieverConfig, DenseRetriever
+
+def init_rag():
+    app_config = ApplicationConfig()
+    embedding_model_path = "./bge-large-zh-v1.5"
+    retriever_config = DenseRetrieverConfig(
+        model_name_or_path=embedding_model_path,
+        dim=1024,
+        index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index')
+    app_config.retriever_config = retriever_config
+    application = RagApplication(app_config)
+    application.init_vector_store()
+    return application
+rag_tool = init_rag()
+
+def RAG(query: str):
+    return rag_tool.get_rag_content(query)
+
 # deepseek-r1
 chatLLM = ChatOpenAI(
     api_key="sk-9f91f7f5e8eb4dfabb71c9df5f72e7d2",
@@ -122,6 +142,8 @@ def answer(llm, student_msg: str, stu_img_content: str):
 
 # 概念性问题回答
 def concept_answer(llm, student_msg: str, stu_img_content: str):
+    #! 使用RAG获取外部知识
+    content = RAG(student_msg)
     messages = [
         SystemMessage('''你是一个教师，你正在与你的学生交流，你需要向学生解答他不懂的概念性问题。
                 学生的问题：''' + student_msg),
@@ -135,13 +157,6 @@ def daily_conversation(llm, student_msg: str, stu_img_content: str):
         HumanMessage(student_msg)
     ]
     return llm.invoke(messages).content
-
-# TODO merge RAG
-def RAG(input):
-    rag_content = 1
-    return rag_content
-
-# TODO answer concept_answer 需要RAG
 
 # 图的构建
 class State(TypedDict):
@@ -271,7 +286,7 @@ def get_config():
     return config
 
 if __name__ == "__main__":
-    graph = GraphBuilder()
+    graph = GraphBuilder() 
     # for s in graph.stream(
     #     {
     #         "messages": [

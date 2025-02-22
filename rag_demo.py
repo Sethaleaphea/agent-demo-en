@@ -2,8 +2,7 @@ import os
 from openai import OpenAI
 from trustrag.modules.retrieval.dense_retriever import DenseRetrieverConfig, DenseRetriever
 client = OpenAI(
-    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
-    api_key="sk-xxx",  # 如何获取API Key：https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key
+    api_key="sk-9f91f7f5e8eb4dfabb71c9df5f72e7d2",
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
 
@@ -39,15 +38,18 @@ class RagApplication():
         contents = '\n'.join([content['text'] for content in contents])
         return contents
 
-if __name__ == '__main__':
-    app_config = ApplicationConfig()
-    embedding_model_path = "./data_process/models/bge-large-zh-v1.5" #随便写一个就可以
-    retriever_config = DenseRetrieverConfig(
-        model_name_or_path=embedding_model_path,
-        dim=1024,
-        index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index')
-    app_config.retriever_config = retriever_config
-    #针对不同用户，有不同的system_prompts
-    app_config.system_prompts = ["你是一个专注于专升本教学的答疑助手", "你是一个通用知识问答助手"]
-    application = RagApplication(app_config)
-    application.init_vector_store()
+# if __name__ == '__main__':
+#     app_config = ApplicationConfig()
+#     embedding_model_path = "./bge-large-zh-v1.5" #随便写一个就可以
+#     retriever_config = DenseRetrieverConfig(
+#         model_name_or_path=embedding_model_path,
+#         dim=1024,
+#         index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index')
+#     app_config.retriever_config = retriever_config
+#     #针对不同用户，有不同的system_prompts
+#     # app_config.system_prompts = ["你是一个专注于专升本教学的答疑助手", "你是一个通用知识问答助手"]
+#     application = RagApplication(app_config)
+#     application.init_vector_store()
+    
+    #* 调用
+    # rag_content = application.get_rag_content(question="什么是专升本", top_k=5)
