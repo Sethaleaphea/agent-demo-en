@@ -12,17 +12,20 @@ from langchain_core.messages import (
 from rag_demo import RagApplication, ApplicationConfig
 from trustrag.modules.retrieval.dense_retriever import DenseRetrieverConfig, DenseRetriever
 
+
 def init_rag():
     app_config = ApplicationConfig()
     embedding_model_path = "./bge-large-zh-v1.5"
     retriever_config = DenseRetrieverConfig(
         model_name_or_path=embedding_model_path,
         dim=1024,
-        index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index') # 知识库路径
+        index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index')  # 知识库路径
     app_config.retriever_config = retriever_config
     application = RagApplication(app_config)
     application.init_vector_store()
     return application
+
+
 # rag_tool = init_rag()
 
 # def RAG(query: str):
@@ -30,6 +33,7 @@ def init_rag():
 
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 base_url = os.getenv("OPENAI_BASE_URL")
@@ -39,7 +43,7 @@ chatLLM = ChatOpenAI(
     model="deepseek-r1",
 )
 # chatLLM = ChatOpenAI(
-#     model_name = "gpt-4o", 
+#     model_name = "gpt-4o",
 #     temperature = 0,
 #     openai_api_key = "sk-EQY6oy2D9Brb2IWxymHTnmeFz5unIyobzHtjDgFs2ZwEPjmY",
 #     base_url="https://api.chatanywhere.tech/v1"
@@ -63,6 +67,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.graph import END, StateGraph, START
 from langgraph.graph.message import add_messages
 
+
 # 获取学生画像
 def stu_img(llm, history_msg: str, student_id: str):
     if student_id == "A":
@@ -75,9 +80,10 @@ def stu_img(llm, history_msg: str, student_id: str):
                     历史对话记录：''' + history_msg),
         ]
         stu_img = llm.invoke(messages).content
-    
+
     stu_img_content = stu_img
     return stu_img
+
 
 # check 学生对话
 def check_msg(llm, history_msg: str, student_msg: str):
@@ -101,8 +107,9 @@ def check_msg(llm, history_msg: str, student_msg: str):
                     如果存在问题，你需要给出合理的建议。
                     历史对话记录：''' + history_msg + '''学生最新一句话：''' + student_msg),
         ]
-    
+
     return llm.invoke(messages).content
+
 
 # 问题改写agent
 def question_rewrite(llm, history_msg: str, student_msg: str):
@@ -114,6 +121,7 @@ def question_rewrite(llm, history_msg: str, student_msg: str):
     ]
     return llm.invoke(messages).content
 
+
 # 矛盾改写
 def worng_question_rewrite(llm, history_msg: str, student_msg: str, wrong_msg: str):
     # worng_msg = "修改意见"
@@ -123,6 +131,7 @@ def worng_question_rewrite(llm, history_msg: str, student_msg: str, wrong_msg: s
                 历史对话记录：''' + history_msg + '''学生最新一句话：''' + student_msg),
     ]
     return llm.invoke(messages).content
+
 
 # 路由 意图识别
 def route_intent(llm, student_msg: str):
@@ -134,7 +143,8 @@ def route_intent(llm, student_msg: str):
                         学生最新一句话：''' + student_msg),
     ]
     return llm.invoke(messages).content
-    
+
+
 # 答疑
 def answer(llm, student_msg: str, stu_img_content: str):
     messages = [
@@ -144,15 +154,17 @@ def answer(llm, student_msg: str, stu_img_content: str):
     ]
     return llm.invoke(messages).content
 
+
 # 概念性问题回答
 def concept_answer(llm, student_msg: str, stu_img_content: str):
-    #! 使用RAG获取外部知识
+    # ! 使用RAG获取外部知识
     # content = RAG(student_msg)
     messages = [
         SystemMessage('''你是一个教师，你正在与你的学生交流，你需要向学生解答他不懂的概念性问题。
                 学生的问题：''' + student_msg),
     ]
     return llm.invoke(messages).content
+
 
 # 日常对话 引导学生提问
 def daily_conversation(llm, student_msg: str, stu_img_content: str):
@@ -162,10 +174,12 @@ def daily_conversation(llm, student_msg: str, stu_img_content: str):
     ]
     return llm.invoke(messages).content
 
+
 # 图的构建
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     node_name: str
+
 
 config = {"configurable": {"thread_id": "1"}}
 configA = {"configurable": {"thread_id": "2"}}
@@ -181,37 +195,44 @@ rewrite_user_message = ""
 # 学生画像
 stu_img_content = ""
 
+
 def GraphBuilder():
     graph_builder = StateGraph(State)
 
     def stu_img_agent(state: State):
-        return {"messages": [AIMessage(content=stu_img(chatLLM, history_msg[student_id], student_id))], "node_name": "stu_img_agent"}
+        return {"messages": [AIMessage(content=stu_img(chatLLM, history_msg[student_id], student_id))],
+                "node_name": "stu_img_agent"}
 
     def check_msg_agent(state: State):
-        return {"messages": [AIMessage(content=check_msg(chatLLM, history_msg[student_id], user_message))], "node_name": "check_msg_agent"}
+        return {"messages": [AIMessage(content=check_msg(chatLLM, history_msg[student_id], user_message))],
+                "node_name": "check_msg_agent"}
 
     def question_rewrite_agent(state: State):
-        return {"messages": [AIMessage(content=question_rewrite(chatLLM, history_msg[student_id], user_message))], "node_name": "question_rewrite_agent"}
-    
+        return {"messages": [AIMessage(content=question_rewrite(chatLLM, history_msg[student_id], user_message))],
+                "node_name": "question_rewrite_agent"}
+
     def wrong_question_rewrite_agent(state: State):
-        return {"messages": [AIMessage(content=worng_question_rewrite(chatLLM, history_msg[student_id], user_message, state["messages"][-1].content))],
+        return {"messages": [AIMessage(content=worng_question_rewrite(chatLLM, history_msg[student_id], user_message,
+                                                                      state["messages"][-1].content))],
                 "node_name": "wrong_question_rewrite_agent"}
 
     def route_intent_agent(state: State):
         rewrite_user_message = state["messages"][-1].content
-        return {"messages": [AIMessage(content=route_intent(chatLLM, rewrite_user_message))], "node_name": "route_intent_agent"}
+        return {"messages": [AIMessage(content=route_intent(chatLLM, rewrite_user_message))],
+                "node_name": "route_intent_agent"}
 
     def answer_agent(state: State):
-        return {"messages": [AIMessage(content=answer(chatLLM, rewrite_user_message, stu_img_content))], "node_name": "answer_agent"}
+        return {"messages": [AIMessage(content=answer(chatLLM, rewrite_user_message, stu_img_content))],
+                "node_name": "answer_agent"}
 
     def concept_answer_agent(state: State):
-        return {"messages": [AIMessage(content=concept_answer(chatLLM, rewrite_user_message, stu_img_content))], 
+        return {"messages": [AIMessage(content=concept_answer(chatLLM, rewrite_user_message, stu_img_content))],
                 "node_name": "concept_answer_agent"}
-    
+
     def daily_conversation_agent(state: State):
-        return {"messages": [AIMessage(content=daily_conversation(chatLLM, rewrite_user_message, stu_img_content))], 
+        return {"messages": [AIMessage(content=daily_conversation(chatLLM, rewrite_user_message, stu_img_content))],
                 "node_name": "daily_conversation_agent"}
-    
+
     def add_node():
         graph_builder.add_node("stu_img_agent", stu_img_agent)
         graph_builder.add_node("check_msg_agent", check_msg_agent)
@@ -235,11 +256,12 @@ def GraphBuilder():
         if "无问题" in last_message.content:
             return "question_rewrite_agent"
         return "wrong_question_rewrite_agent"
-    
+
     graph_builder.add_conditional_edges(
         "check_msg_agent",
-        rewrite_router, 
-        {"question_rewrite_agent": "question_rewrite_agent", "wrong_question_rewrite_agent": "wrong_question_rewrite_agent"},
+        rewrite_router,
+        {"question_rewrite_agent": "question_rewrite_agent",
+         "wrong_question_rewrite_agent": "wrong_question_rewrite_agent"},
     )
     graph_builder.add_edge("question_rewrite_agent", "route_intent_agent")
     graph_builder.add_edge("wrong_question_rewrite_agent", END)
@@ -258,12 +280,13 @@ def GraphBuilder():
         "route_intent_agent",
         router,
         # {"continue": "chart_generator", "call_tool": "call_tool", END: END},
-        {"concept_answer_agent": "concept_answer_agent", "daily_conversation_agent": "daily_conversation_agent", "answer_agent": "answer_agent"},
+        {"concept_answer_agent": "concept_answer_agent", "daily_conversation_agent": "daily_conversation_agent",
+         "answer_agent": "answer_agent"},
     )
 
-    graph_builder.add_edge("concept_answer_agent",END)
-    graph_builder.add_edge("daily_conversation_agent",END)
-    graph_builder.add_edge("answer_agent",END)
+    graph_builder.add_edge("concept_answer_agent", END)
+    graph_builder.add_edge("daily_conversation_agent", END)
+    graph_builder.add_edge("answer_agent", END)
 
     # 记忆
     from langgraph.checkpoint.memory import MemorySaver
@@ -278,9 +301,11 @@ def GraphBuilder():
         with open("output.png", "wb") as f:
             f.write(img_data)
         display(Image(img_data))
+
     draw_graph()
-    
+
     return graph
+
 
 def get_config():
     if student_id == 'A':
@@ -289,8 +314,9 @@ def get_config():
         return configB
     return config
 
+
 if __name__ == "__main__":
-    graph = GraphBuilder() 
+    graph = GraphBuilder()
     # for s in graph.stream(
     #     {
     #         "messages": [
@@ -304,11 +330,11 @@ if __name__ == "__main__":
     #     if "__end__" not in s:
     #         print(s)
     #         print("----")
-        
+
     while True:
-        print ("请输入：")
+        print("请输入：")
         user_message = input()
-        
+
         events = graph.stream(
             {
                 "messages": [
@@ -325,8 +351,7 @@ if __name__ == "__main__":
                 # event["messages"][-1].pretty_print()
                 print('---' + event["node_name"] + '---')
                 print(event["messages"][-1].content)
-        
+
         history_msg[student_id] = history_msg[student_id] + "学生：" + user_message + "\n"
         history_msg[student_id] = history_msg[student_id] + "教师：" + event["messages"][-1].content + "\n"
-        
-        
+
