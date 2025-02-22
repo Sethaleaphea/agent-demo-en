@@ -18,20 +18,24 @@ def init_rag():
     retriever_config = DenseRetrieverConfig(
         model_name_or_path=embedding_model_path,
         dim=1024,
-        index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index')
+        index_path='/home/dalhxwlyjsuo/guest/result/indexs/dense_cache/fassis.index') # 知识库路径
     app_config.retriever_config = retriever_config
     application = RagApplication(app_config)
     application.init_vector_store()
     return application
-rag_tool = init_rag()
+# rag_tool = init_rag()
 
-def RAG(query: str):
-    return rag_tool.get_rag_content(query)
+# def RAG(query: str):
+#     return rag_tool.get_rag_content(query)
 
-# deepseek-r1
+from dotenv import load_dotenv
+import os
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+base_url = os.getenv("OPENAI_BASE_URL")
 chatLLM = ChatOpenAI(
-    api_key="sk-9f91f7f5e8eb4dfabb71c9df5f72e7d2",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=api_key,
+    base_url=base_url,
     model="deepseek-r1",
 )
 # chatLLM = ChatOpenAI(
@@ -143,7 +147,7 @@ def answer(llm, student_msg: str, stu_img_content: str):
 # 概念性问题回答
 def concept_answer(llm, student_msg: str, stu_img_content: str):
     #! 使用RAG获取外部知识
-    content = RAG(student_msg)
+    # content = RAG(student_msg)
     messages = [
         SystemMessage('''你是一个教师，你正在与你的学生交流，你需要向学生解答他不懂的概念性问题。
                 学生的问题：''' + student_msg),

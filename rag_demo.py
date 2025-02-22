@@ -1,10 +1,5 @@
 import os
-from openai import OpenAI
 from trustrag.modules.retrieval.dense_retriever import DenseRetrieverConfig, DenseRetriever
-client = OpenAI(
-    api_key="sk-9f91f7f5e8eb4dfabb71c9df5f72e7d2",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-)
 
 class ApplicationConfig():
     def __init__(self):
