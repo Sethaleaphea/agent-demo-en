@@ -2,3 +2,8 @@ TrustRAG/
 deepseek.py
 add_rag.py
 bge-small-zh-v1.5/
+bge-large-zh-v1.5/
+__pycache__/
+rag_demo.py
+rag.py
+.gitignore/
