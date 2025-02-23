@@ -4,6 +4,10 @@ output.png：目前框架结构
 
 rag_demo.py:提供rag接口
 
+demo_page.py：ui 
+
+```streamlit run demo_page.py```
+
 ————————————————————————————
 
 demo_re.py：封装demo.py
