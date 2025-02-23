@@ -355,3 +355,5 @@ if __name__ == "__main__":
         history_msg[student_id] = history_msg[student_id] + "学生：" + user_message + "\n"
         history_msg[student_id] = history_msg[student_id] + "教师：" + event["messages"][-1].content + "\n"
 
+        print("当前对话历史：")
+        print(history_msg)  # 打印 history_msg

@@ -8,7 +8,7 @@ from langgraph.graph import END, StateGraph, START
 from langgraph.graph.message import add_messages
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 
-from demo import run
+from demo_re import run
 
 # export LANG=en_US.UTF-8
 # export LC_ALL=en_US.UTF-8
@@ -45,11 +45,11 @@ def stu_intent(llm, student_msg: str):
 # 答疑函数
 def qa(llm, student_msg: str):
     """
-    答疑函数，调用 demo.py 的 run 函数处理用户输入。
+    答疑函数，调用 demo_re.py 的 run 函数处理用户输入。
     """
-    # 调用 demo.py 的 run 函数
     run(student_msg)
     return "答疑完成"
+
 
 # 出题函数
 def qg(llm, student_msg: str):

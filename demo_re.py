@@ -13,6 +13,8 @@ from rag_demo import RagApplication, ApplicationConfig
 from trustrag.modules.retrieval.dense_retriever import DenseRetrieverConfig, DenseRetriever
 
 
+
+# 初始化 rag 应用
 def init_rag():
     app_config = ApplicationConfig()
     embedding_model_path = "./bge-large-zh-v1.5"
@@ -31,6 +33,9 @@ def init_rag():
 # def RAG(query: str):
 #     return rag_tool.get_rag_content(query)
 
+
+
+# 加载环境变量并初始化 ChatOpenAI
 from dotenv import load_dotenv
 import os
 
@@ -68,7 +73,9 @@ from langgraph.graph import END, StateGraph, START
 from langgraph.graph.message import add_messages
 
 
-# 获取学生画像
+
+# 定义对话处理函数
+# 1. 获取学生画像
 def stu_img(llm, history_msg: str, student_id: str):
     if student_id == "A":
         stu_img = "学生A的画像"
@@ -85,7 +92,7 @@ def stu_img(llm, history_msg: str, student_id: str):
     return stu_img
 
 
-# check 学生对话
+# 2. check 学生对话
 def check_msg(llm, history_msg: str, student_msg: str):
     if history_msg == "":
         messages = [
@@ -111,7 +118,7 @@ def check_msg(llm, history_msg: str, student_msg: str):
     return llm.invoke(messages).content
 
 
-# 问题改写agent
+# 3. 问题改写agent
 def question_rewrite(llm, history_msg: str, student_msg: str):
     if history_msg == "":
         return student_msg
@@ -122,7 +129,7 @@ def question_rewrite(llm, history_msg: str, student_msg: str):
     return llm.invoke(messages).content
 
 
-# 矛盾改写
+# 4. 矛盾改写
 def worng_question_rewrite(llm, history_msg: str, student_msg: str, wrong_msg: str):
     # worng_msg = "修改意见"
     # 推测用户意图，解答 返回
@@ -133,7 +140,7 @@ def worng_question_rewrite(llm, history_msg: str, student_msg: str, wrong_msg: s
     return llm.invoke(messages).content
 
 
-# 路由 意图识别
+# 5. 路由 意图识别
 def route_intent(llm, student_msg: str):
     messages = [
         SystemMessage('''你是一个教师，你正在与你的学生交流，你需要根据当前学生最新一句话按下面的流程判断学生当前意图。
@@ -145,7 +152,7 @@ def route_intent(llm, student_msg: str):
     return llm.invoke(messages).content
 
 
-# 答疑
+# 6. 答疑
 def answer(llm, student_msg: str, stu_img_content: str):
     messages = [
         SystemMessage('''你是一个教师，你正在与你的学生交流，你需要根据查阅到的资料解答学生的问题。
@@ -155,7 +162,7 @@ def answer(llm, student_msg: str, stu_img_content: str):
     return llm.invoke(messages).content
 
 
-# 概念性问题回答
+# 7. 概念性问题回答
 def concept_answer(llm, student_msg: str, stu_img_content: str):
     # ! 使用RAG获取外部知识
     # content = RAG(student_msg)
@@ -166,7 +173,7 @@ def concept_answer(llm, student_msg: str, stu_img_content: str):
     return llm.invoke(messages).content
 
 
-# 日常对话 引导学生提问
+# 8. 日常对话 引导学生提问
 def daily_conversation(llm, student_msg: str, stu_img_content: str):
     messages = [
         SystemMessage("你是一个教师，你正在与你的学生交流，你的任务是对学生的对话进行回应，在你的回复中应该引导学生提出问题。"),
@@ -175,7 +182,8 @@ def daily_conversation(llm, student_msg: str, stu_img_content: str):
     return llm.invoke(messages).content
 
 
-# 图的构建
+
+# 构建对话图
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     node_name: str
@@ -196,7 +204,8 @@ rewrite_user_message = ""
 stu_img_content = ""
 
 
-def GraphBuilder():
+def GraphBuilder(history_msg: dict):
+# def GraphBuilder():
     graph_builder = StateGraph(State)
 
     def stu_img_agent(state: State):
@@ -206,6 +215,7 @@ def GraphBuilder():
     def check_msg_agent(state: State):
         return {"messages": [AIMessage(content=check_msg(chatLLM, history_msg[student_id], user_message))],
                 "node_name": "check_msg_agent"}
+
 
     def question_rewrite_agent(state: State):
         return {"messages": [AIMessage(content=question_rewrite(chatLLM, history_msg[student_id], user_message))],
@@ -316,13 +326,11 @@ def get_config():
 
 
 
+# 运行对话系统
 def run(user_message: str, student_id: str = "A", history_msg: dict = None):
-    """
-    封装主函数逻辑，供外部调用。
-    """
     if history_msg is None:
         history_msg = {"A": "", "B": ""}  # 初始化历史记录
-    graph = GraphBuilder()
+    graph = GraphBuilder(history_msg)
     events = graph.stream(
         {
             "messages": [
@@ -334,22 +342,23 @@ def run(user_message: str, student_id: str = "A", history_msg: dict = None):
         stream_mode="values"
     )
     for event in events:
-        # print(event)
         if "messages" in event:
-            # event["messages"][-1].pretty_print()
             print('---' + event["node_name"] + '---')
             print(event["messages"][-1].content)
 
     history_msg[student_id] = history_msg[student_id] + "学生：" + user_message + "\n"
     history_msg[student_id] = history_msg[student_id] + "教师：" + event["messages"][-1].content + "\n"
 
-
     return history_msg  # 返回更新后的历史记录
 
 
+
 if __name__ == "__main__":
+    history_msg = None  # 初始化对话历史
     while True:
         print("请输入：")
         user_message = input()
-        run(user_message)  # 调用 run 函数
+        history_msg = run(user_message, history_msg=history_msg)  # 调用 run 函数并获取更新后的 history_msg
+        print("当前对话历史：")
+        print(history_msg)  # 打印 history_msg
 
