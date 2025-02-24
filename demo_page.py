@@ -1,4 +1,4 @@
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAI
 import os
 import json
 from langchain_core.messages import (
@@ -18,13 +18,14 @@ base_url = os.getenv("OPENAI_BASE_URL")
 chatLLM = ChatOpenAI(
     api_key=api_key,
     base_url=base_url,
-    model="deepseek-r1",
+    model="deepseek-v3",
 )
 
 from trustrag.modules.retrieval.dense_retriever import DenseRetrieverConfig, DenseRetriever
+from trustrag.modules.retrieval.embedding import FlagModelEmbedding
 
 
-def RAG(query: str):
+def RAG(query: str, retriever: DenseRetriever):
     step_back_prompt="""你是一位擅长从具体问题中提炼出更通用问题的专家，该通用问题能揭示回答具体问题所需的基本原理。
     你将会收到关于专升本教育中各个学科的问题，针对用户提出的具体问题，请你提炼出一个更抽象、更通用的问题，该问题是回答原问题所必须解决的核心问题。
     注意：如果遇到不认识的单词或缩略语，请不要尝试改写它们。请尽量编写简洁的问题。"""
@@ -49,6 +50,16 @@ def RAG(query: str):
     contents = '\n'.join([content['text'] for content in contents])
     return contents
 
+def QA_RAG(query: str, retriever: DenseRetriever):
+    with st.status("QA_RAG...", expanded=True) as status:
+        contents = retriever.retrieve(query=query, top_k=5)
+        st.markdown(contents)
+        status.update(
+            label="RAG", state="complete", expanded=False
+        )
+    
+    contents = '\n'.join([content['text'] for content in contents])
+    return contents
 
 from typing import Annotated
 from typing_extensions import TypedDict
@@ -60,15 +71,8 @@ config = {"configurable": {"thread_id": "1"}}
 configA = {"configurable": {"thread_id": "2"}}
 configB = {"configurable": {"thread_id": "3"}}
 
-student_id = ""
-# 历史记录 学生对话 自动记录·
-history_msg = {"A": "", "B": ""}
-user_message = ""
-# 改写后的问题
-rewrite_user_message = ""
-# 学生画像
-stu_img_content = ""
 
+# TODO 结合教材内容
 # 获取学生画像
 def stu_img(llm, history_msg: str, student_id: str):
     if student_id == "A":
@@ -165,21 +169,28 @@ def route_intent(llm, student_msg: str):
 # 习题解答
 def answer(llm, student_msg: str, stu_img_content: str):
     # 分步骤给出解答 以便学生提问和理解
-    rag_prompt = '''你是一个教师，你正在与你的学生交流，你需要向学生解答他不懂的习题。请结合参考的上下文内容为学生解答。
+    rag_prompt = '''你是一个教师，你正在与你的学生交流，你需要向学生解答他不懂的习题，请结合可参考的上下文内容以及详细问题及解析为学生解答。
                 同时，学生画像反映了该学生的知识水平，请根据下面学生画像中反映出的知识水平，为该学生提供个性化、分层次的讲解，要求量身定制：回答时请结合学生的知识水平，采用适合的术语和解释深度。
                 <注意事项>
                 对于优秀的学生，你只需要给出一点启发即可。
                 对于普通学生，你需要给出详细的思考步骤，以便学生能够理解。
-                学生的问题：{question}
-                学生画像：{stu_img}
-                可参考的上下文：
-                   ···
-                   {context}
-                   ···
-                   有用的回答:"""
+                <学生的问题>
+                {question}
+                <学生画像>
+                {stu_img}
+                <相似题目>
+                    ···
+                    {qa_contents}
+                    ···
+                <可参考的上下文>
+                    ···
+                    {context}
+                    ···
+                    有用的回答:"""
                 '''
-    contents = RAG(student_msg)
-    prompt = rag_prompt.format(question=student_msg, stu_img=stu_img_content,context=contents)
+    contents = RAG(student_msg, retriever)
+    qa_contents = QA_RAG(user_message, qa_retriever)
+    prompt = rag_prompt.format(question=student_msg, stu_img=stu_img_content,context=contents, qa_contents=qa_contents)
     messages = [
         SystemMessage(prompt),
     ]
@@ -201,9 +212,9 @@ def concept_answer(llm, student_msg: str, stu_img_content: str):
                    ···
                    有用的回答:"""
                 '''
-    contents = RAG(student_msg)
-    # print('RAG-content')
-    print(contents)
+    contents = RAG(student_msg, retriever)
+    # TODO newnode 检索相似题目作为推荐
+    qa_contents = QA_RAG(student_msg, qa_retriever)
     prompt = rag_prompt.format(question=student_msg, stu_img=stu_img_content,context=contents)
     messages = [
         SystemMessage(prompt),
@@ -228,19 +239,16 @@ def GraphBuilder():
     graph_builder = StateGraph(State)
 
     def stu_img_agent(state: State):
-        return {"messages": [AIMessage(content=stu_img(chatLLM, history_msg[student_id], student_id))], "node_name": "stu_img_agent"}
+        return {"messages": [AIMessage(content=stu_img(chatLLM, st.session_state.history_msg[student_id], student_id))], "node_name": "stu_img_agent"}
 
     def check_msg_agent(state: State):
-        # TODO 历史记录保存出错
-        print (history_msg[student_id])
-        print (student_id)
-        return {"messages": [AIMessage(content=check_msg(chatLLM, history_msg[student_id], user_message))], "node_name": "check_msg_agent"}
+        return {"messages": [AIMessage(content=check_msg(chatLLM, st.session_state.history_msg[student_id], user_message))], "node_name": "check_msg_agent"}
 
     def question_rewrite_agent(state: State):
-        return {"messages": [AIMessage(content=question_rewrite(chatLLM, history_msg[student_id], user_message))], "node_name": "question_rewrite_agent"}
+        return {"messages": [AIMessage(content=question_rewrite(chatLLM, st.session_state.history_msg[student_id], user_message))], "node_name": "question_rewrite_agent"}
     
     def wrong_question_rewrite_agent(state: State):
-        return {"messages": [AIMessage(content=worng_question_rewrite(chatLLM, history_msg[student_id], user_message, state["messages"][-1].content))],
+        return {"messages": [AIMessage(content=worng_question_rewrite(chatLLM, st.session_state.history_msg[student_id], user_message, state["messages"][-1].content))],
                 "node_name": "wrong_question_rewrite_agent"}
 
     def route_intent_agent(state: State):
@@ -337,32 +345,52 @@ def get_config():
         return configB
     return config
 
-if __name__ == "__main__":
-    graph = GraphBuilder() 
-    index_path=r'D:/code/agent_demo/dense_cache'
-    embedding_model_path = r"./bge-large-zh-v1.5"  # 随便写一个就可以
+def RetrieverBuilder(embedding_model_path: str, index_path: str):
     retriever_config = DenseRetrieverConfig(
         model_name_or_path=embedding_model_path,
         dim=1024,
-        index_path=index_path)
-    
-    from trustrag.modules.retrieval.embedding import FlagModelEmbedding
+        index_path= index_path
+    )
     embedding_generator = FlagModelEmbedding(embedding_model_path)
     retriever = DenseRetriever(retriever_config, embedding_generator)
     retriever.load_index(index_path)
+    return retriever
+
+if __name__ == "__main__":
+    graph = GraphBuilder() 
+    embedding_model_path = r"D:/Python/models/bge-large-zh-v1.5"  # 随便写一个就可以
+    index_path = r'D:/code/agent_demo/dense_cache'
+    qa_index_path = r'D:/code/agent_demo/qa_dense_cache'
+    
+    retriever = RetrieverBuilder(embedding_model_path, index_path)
+    qa_retriever = RetrieverBuilder(embedding_model_path, qa_index_path)
+    
 
     import streamlit as st
+    
+    student_id = ""
+    # 历史记录 学生对话 自动记录·
+    user_message = ""
+    # 改写后的问题
+    rewrite_user_message = ""
+    # 学生画像
+    stu_img_content = ""
 
     st.title('🤖 AI老师')
     col1, col2 = st.columns([3, 1])
     
     # 设置学生ID选项
     student_id = st.selectbox('选择学生ID', ['A', 'B'])
+    # TODO 模型选择
+    model_name = st.selectbox('选择模型', ['DeepSeek-R1', 'DeepSeek-V3'])
 
 
     # 初始化聊天记录
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    
+    if "history_msg" not in st.session_state:
+        st.session_state.history_msg = {"A": "", "B": ""}
 
     # 展示聊天记录
     for message in st.session_state.messages:
@@ -395,23 +423,19 @@ if __name__ == "__main__":
         
         with st.chat_message('assistant', avatar='🤖'):
             for event in events:
-                # print(event)
                 if "messages" in event:
-                    # event["messages"][-1].pretty_print()
                     with st.status(event["node_name"] + "...", expanded=True) as status:
-                        st.markdown(event["messages"][-1].content)
                         if event["node_name"] == "answer_agent" or event["node_name"] == "concept_answer_agent" or event["node_name"] == "daily_conversation_agent":
+                            st.markdown(event["messages"][-1].content)
                             status.update(
                                 label=event["node_name"], state="complete", expanded=True
                             )
                         else:
+                            st.markdown(event["node_name"])
                             status.update(
                                 label=event["messages"][-1].content, state="complete", expanded=False
                             )
         
         st.session_state.messages.append({'student_id': student_id, 'role': 'assistant', 'content': event["messages"][-1].content})
-        
-        history_msg[student_id] = history_msg[student_id] + "学生：" + user_message + "\n"
-        history_msg[student_id] = history_msg[student_id] + "教师：" + event["messages"][-1].content + "\n"
-        print (history_msg[student_id])
-        print (student_id)
+        st.session_state.history_msg[student_id] = st.session_state.history_msg[student_id] + "学生：" + user_message + "\n"
+        st.session_state.history_msg[student_id] = st.session_state.history_msg[student_id] + "教师：" + event["messages"][-1].content + "\n"
