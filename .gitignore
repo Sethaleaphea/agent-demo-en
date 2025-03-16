@@ -14,4 +14,6 @@ q2_output.json
 GraphragTest
 .idea
 11--2023年广东省普通高校专升本考试专用教材·教育理论_parsed_output.txt
-.TXT2KG.ipynb
+TXT2KG.ipynb
+config.yml
+edu.txt
