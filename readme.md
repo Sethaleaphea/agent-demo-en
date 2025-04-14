@@ -18,4 +18,4 @@ global_graph.png：整体框架结构，qa_agent对应output.png
 
 ————————————————————————————
 
-[kg文件夹为知识图谱相关](kg\readme.md)
+[kg文件夹为知识图谱相关](kg/readme.md)
